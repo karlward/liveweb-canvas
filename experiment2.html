@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+	<head>
+	    <meta charset="UTF-8">
+		<script type="text/javascript" src="http://localhost:8080/socket.io/socket.io.js"></script>
+		<script type="text/javascript">
+			var mouseDown = false;
+			var px = 0;
+			var py = 0;
+			var opx = 0;
+			var opy = 0;
+		
+			var socket = io.connect('http://localhost:8080/');
+			
+			socket.on('connect', function() {
+				console.log("Connected");
+			});
+
+			// Receive from any event
+			socket.on('othermouse', function (data) {
+				console.log(data.x + " " + data.y);
+				odraw(data.x,data.y);
+			});
+			socket.on('otherclear', function(data) {
+				console.log('received clear');
+				clearSelf();
+			});
+			socket.on('otherfile', function(data) {
+			  console.log('received file');
+			  receiveImg(data);
+			});
+			
+			var sendmouse = function(xval, yval) {
+				console.log("sendmouse: " + xval + " " + yval);
+				socket.emit('othermouse',{ x: xval, y: yval });
+			};
+			
+			var sendclear = function() {
+				console.log('sendclear');
+				socket.emit('otherclear', true);
+			};
+			
+			var sendimg = function(dataURL) {
+              console.log('sending file across');
+              socket.emit('otherfile', dataURL);
+			};
+
+			///////////////
+			
+			var canvas;
+			var context;
+
+			var initcanvas = function() {
+				canvas = document.getElementById('mycanvas');
+				context = canvas.getContext('2d');
+			
+				context.fillStyle="#EEEEEE";
+				context.fillRect(0,0,canvas.width,canvas.height);	
+				canvas.addEventListener('mousedown', function(evt) {
+					mouseDown = true;
+				});
+				canvas.addEventListener('mouseup', function() {
+					mouseDown = false;
+				});
+
+				canvas.addEventListener('mousemove', function(evt) {
+					
+					//console.log("mousemove " + evt.clientX + " " + evt.clientY);
+					
+					//evt.clientX is x but in the entire window, not the canvas
+					//evt.clientY is y
+		
+					// Get the canvas bounding rect
+					var canvasRect = canvas.getBoundingClientRect(); 
+
+					// Now calculate the mouse position values
+					y = evt.clientY - canvasRect.top; // minus the starting point of the canvas rect
+					x = evt.clientX - canvasRect.left;  // minus the starting point of the canvas rect on the x axis
+				
+					console.log("mousemove x:" + x + " y:" + y);
+					if (mouseDown === true) {
+						sendmouse(x,y);
+						draw(x,y);
+					};
+				}, false);				
+			};
+				
+
+	
+			var draw = function(xval,yval) {
+				
+				console.log("draw " + xval + " " + yval);
+				
+				context.beginPath();
+	
+				// This is silly but it's what we have to do to get a random hex string
+				context.strokeStyle='#000000';
+	
+				context.moveTo(px,py);
+				context.lineTo(xval,yval);
+
+				context.stroke();
+				
+				px = xval;
+				py = yval;
+			};
+
+
+	
+			var odraw = function(xval,yval) {
+				
+				console.log("draw " + xval + " " + yval);
+				
+				context.beginPath();
+	
+				// This is silly but it's what we have to do to get a random hex string
+				context.strokeStyle='#000000';
+	
+				context.moveTo(opx,opy);
+				context.lineTo(xval,yval);
+
+				context.stroke();
+				
+				opx = xval;
+				opy = yval;
+			};
+	
+			var saveImg = function (data) {
+			  /* canvas.toBlob(function(blob) {
+			    var newImg = document.createElement("img"),
+			        url = URL.createObjectURL(blob);
+			    newImg.onload = function() {
+			      // no longer need to read the blob so it's revoked
+			      URL.revokeObjectURL(url);
+			    };
+			    newImg.src = url;
+			    newImg.width = 150;
+			    newImg.height = 150;
+			    document.body.appendChild(newImg);
+			  }); */
+			  var url;
+			  if (data) {
+			    console.log('setting data from arg');
+			    url = data;
+			  }
+			  else { 
+			    console.log('setting data from canvas');
+			    url = canvas.toDataURL();
+			    sendimg(url);
+			  }
+			  console.log("got dataURL " + url);
+			  var newImg = document.createElement("img"), url = url;
+		      newImg.src = url;
+		      newImg.width = 150;
+		      newImg.height = 150;
+		      document.body.appendChild(newImg);
+			};
+			
+			var clearSelf = function () {
+				console.log("clearing self");
+				context.clearRect(0,0,canvas.width,canvas.height);
+				context.fillStyle="#EEEEEE";
+				context.fillRect(0,0,canvas.width,canvas.height);
+			};
+			
+			var receiveImg = function(data) {
+			  console.log('receiving file' + data);
+			  saveImg(data);
+			};
+
+		</script>	
+	</head>
+	<body onload="initcanvas();">
+		<button onclick="saveImg();">SAVE</button>
+		<button onclick="clearSelf();sendclear();">ERASE</button>
+		<br/>
+		<canvas width="600" height="600" id="mycanvas"></canvas>
+	</body>
+</html>
